@@ -1,0 +1,368 @@
+<?php
+// STEP 1 PENCARIAN PENYAKIT 
+function diagnosa($id_diagnosa, $jenis_ph, $tampil)
+{
+    global $koneksi;
+
+    // Mengambil gejala-gejala yang terkait dengan id_diagnosa
+    $sql = "SELECT id_gejala FROM tb_detail_diagnosa WHERE id_diagnosa = ?";
+    $stmt = $koneksi->prepare($sql);
+
+    if ($stmt === false) {
+        die("Error preparing statement for gejala query: " . $koneksi->error);
+    }
+
+    $stmt->bind_param("i", $id_diagnosa);
+    $stmt->execute();
+    $result = $stmt->get_result();
+
+    if ($result->num_rows === 0) {
+        die("No gejala found for the given id_diagnosa.");
+    }
+
+    $gejala_ids = [];
+    while ($row = $result->fetch_assoc()) {
+        $gejala_ids[] = $row['id_gejala'];
+    }
+    $stmt->close();
+
+    if (empty($gejala_ids)) {
+        die("No gejala found for the given id_diagnosa.");
+    }
+
+    // Mengambil semua penyakit (PH) yang terkait dengan gejala
+    $gejala_ids_placeholders = implode(',', array_fill(0, count($gejala_ids), '?'));
+    $sql = "SELECT tb_ph.id_ph, tb_ph.nama_ph, tb_ph.kode_ph, COUNT(tb_gejala_ph.id_gejala) as gejala_count
+            FROM tb_ph
+            JOIN tb_gejala_ph ON tb_ph.id_ph = tb_gejala_ph.id_ph
+            WHERE tb_gejala_ph.id_gejala IN ($gejala_ids_placeholders)
+            GROUP BY tb_ph.id_ph
+            ORDER BY gejala_count DESC";
+
+    $stmt = $koneksi->prepare($sql);
+
+    if ($stmt === false) {
+        die("Error preparing statement for penyakit query: " . $koneksi->error);
+    }
+
+    // Bind parameters
+    $types = str_repeat('i', count($gejala_ids));
+    $stmt->bind_param($types, ...$gejala_ids);
+    $stmt->execute();
+    $result = $stmt->get_result();
+
+    if ($result->num_rows === 0) {
+        die("No penyakit found matching the given gejala.");
+    }
+
+    $penyakit = [];
+    while ($row = $result->fetch_assoc()) {
+        $penyakit[] = [
+            'id_ph' => $row['id_ph'],
+            'kode_ph' => $row['kode_ph'],
+            'nama_ph' => $row['nama_ph'],
+            'gejala_count' => $row['gejala_count']
+        ];
+    }
+    $stmt->close();
+
+    // Menentukan penyakit dengan jumlah gejala tertinggi
+    if (empty($penyakit)) {
+        return "No penyakit found.";
+    }
+
+    // Pilih penyakit dengan jumlah gejala terbanyak
+    $best_match = $penyakit[0];
+    $id_ph      = $best_match['id_ph'];
+    $kode_ph    = $best_match['kode_ph'];
+    $nama_ph    = $best_match['nama_ph'];
+    
+    $persentase = nilai_bayes($id_diagnosa, $id_ph, 'persentase');
+    if($persentase < 55){
+        $kepastian = 'Tidak pasti';
+    }else if($persentase >= 55 && $persentase <= 75){
+        $kepastian = 'Pasti';
+    }else if($persentase >= 76){
+        $kepastian = 'Sangat Pasti';
+    }
+    $text = "<p>Berdasarkan Hasil Perhitungan dengan menggunakan metode Teorema Bayes, gejala yang dialami oleh tanaman jeruk, Maka Dapat Disimpulkan Nilai Tertinggi Dari perhitungan yang telah dilakukan adalah <b>$kode_ph</b> Yaitu $jenis_ph <b>$nama_ph</b> Dengan Nilai Probabilitas " .nilai_bayes($id_diagnosa, $id_ph, 'nilai_bayes') . " Atau $persentase% Dengan Kategori $kepastian</p>";
+
+    if ($tampil == 'text'){
+        return $text;
+    } else if ($tampil == 'id_ph') {
+        return $id_ph;
+    }else if ($tampil == 'kode_ph') {
+        return $kode_ph;
+    } else if ($tampil == 'ph') {
+        return $nama_ph;
+    } else if ($tampil == 'total_bobot') {
+        return hitung_bobot($id_diagnosa, $id_ph);
+    } else if ($tampil == 'nilai_hipotesa') {
+        return nilai_hipotesa($id_diagnosa, $id_ph);
+    } else if ($tampil == 'nilai_hipotesa_audience') {
+        return nilai_hipotesa_audience($id_diagnosa, $id_ph, 'jumlah');
+    } else if ($tampil == 'nilai_hipotesa_audience_array') {
+        return nilai_hipotesa_audience($id_diagnosa, $id_ph, 'array');
+    } else if ($tampil == 'nilai_Hi_E') {
+        return nilai_Hi_E($id_diagnosa, $id_ph);
+    } else if ($tampil == 'nilai_bayes') {
+        return nilai_bayes($id_diagnosa, $id_ph, 'nilai_bayes');
+    } else if ($tampil == 'persentase') {
+        return nilai_bayes($id_diagnosa, $id_ph, 'persentase');
+    }
+}
+
+// STEP 2 PENJUMLAHAN BOBOT 
+function hitung_bobot($id_diagnosa, $id_ph)
+{
+    global $koneksi;
+
+    // Mengambil gejala-gejala yang terkait dengan id_diagnosa
+    $sql = "SELECT * FROM tb_detail_diagnosa WHERE id_diagnosa = ?";
+    $stmt = $koneksi->prepare($sql);
+
+    if ($stmt === false) {
+        die("Error preparing statement for gejala query: " . $koneksi->error);
+    }
+
+    $stmt->bind_param("i", $id_diagnosa);
+    $stmt->execute();
+    $result = $stmt->get_result();
+
+    if ($result->num_rows === 0) {
+        die("No gejala found for the given id_diagnosa.");
+    }
+
+    $gejala_ids = [];
+    while ($row = $result->fetch_assoc()) {
+        $gejala_ids[] = $row['id_gejala'];
+    }
+    $stmt->close();
+
+    if (empty($gejala_ids)) {
+        die("No gejala found for the given id_diagnosa.");
+    }
+
+    // Mengambil bobot gejala untuk penyakit tertentu
+    $gejala_ids_placeholders = implode(',', array_fill(0, count($gejala_ids), '?'));
+    $sql = "SELECT SUM(tb_gejala.bobot) as total_bobot
+            FROM tb_gejala
+            INNER JOIN tb_gejala_ph ON tb_gejala.id_gejala = tb_gejala_ph.id_gejala
+            WHERE tb_gejala_ph.id_gejala IN ($gejala_ids_placeholders)
+            AND tb_gejala_ph.id_ph = ?";
+
+    $stmt = $koneksi->prepare($sql);
+
+    if ($stmt === false) {
+        die("Error preparing statement for bobot query: " . $koneksi->error);
+    }
+
+    // Bind parameters
+    $types = str_repeat('i', count($gejala_ids)) . 'i';
+    $params = array_merge($gejala_ids, [$id_ph]);
+    $stmt->bind_param($types, ...$params);
+    $stmt->execute();
+    $result = $stmt->get_result();
+
+    if ($result->num_rows === 0) {
+        die("No bobot found for the given id_ph.");
+    }
+
+    $row = $result->fetch_assoc();
+    $total_bobot = $row['total_bobot'];
+    $stmt->close();
+
+    return $total_bobot;
+}
+
+
+// STEP 3 MENCARI NILAI HIPOTESA TANPA MEMANDANG AUDIENCE
+function nilai_hipotesa($id_diagnosa, $id_ph)
+{
+    global $koneksi;
+
+    // Menghitung total bobot untuk penyakit tertentu
+    $total_bobot1 = hitung_bobot($id_diagnosa, $id_ph);
+
+    // Mengambil bobot gejala dari tb_detail_diagnosa
+    $sql = "SELECT tb_detail_diagnosa.id_gejala, tb_gejala.bobot
+            FROM tb_detail_diagnosa
+            INNER JOIN tb_gejala ON tb_detail_diagnosa.id_gejala = tb_gejala.id_gejala
+            WHERE tb_detail_diagnosa.id_diagnosa = ?";
+
+    $stmt = $koneksi->prepare($sql);
+
+    if ($stmt === false) {
+        die("Error preparing statement for gejala query: " . $koneksi->error);
+    }
+
+    $stmt->bind_param("i", $id_diagnosa);
+    $stmt->execute();
+    $result = $stmt->get_result();
+
+    if ($result->num_rows === 0) {
+        die("No gejala found for the given id_diagnosa.");
+    }
+
+    // Mengumpulkan bobot gejala
+    $bobot_gejala = [];
+    while ($row = $result->fetch_assoc()) {
+        $bobot_gejala[$row['id_gejala']] = $row['bobot'];
+    }
+    $stmt->close();
+
+    if (empty($bobot_gejala)) {
+        die("No gejala found for the given id_diagnosa.");
+    }
+
+    // Menghitung nilai hipotesa untuk setiap gejala
+    $nilai_hipotesa = [];
+    foreach ($bobot_gejala as $id_gejala => $bobot) {
+        $nilai_hipotesa[$id_gejala] = number_format($bobot / $total_bobot1, 3);
+    }
+
+    return $nilai_hipotesa;
+}
+
+// STEP 4 MENCARI NILAI HIPOTESA MEMANDANG AUDIENCE
+function nilai_hipotesa_audience($id_diagnosa, $id_ph, $tampilkan)
+{
+    global $koneksi;
+
+    // Mendapatkan nilai hipotesa
+    $nilai_hipotesa = nilai_hipotesa($id_diagnosa, $id_ph);
+
+    // Mengambil bobot gejala dari tb_detail_diagnosa
+    $sql = "SELECT tb_detail_diagnosa.id_gejala, tb_gejala.bobot
+            FROM tb_detail_diagnosa
+            INNER JOIN tb_gejala ON tb_detail_diagnosa.id_gejala = tb_gejala.id_gejala
+            WHERE tb_detail_diagnosa.id_diagnosa = ?";
+
+    $stmt = $koneksi->prepare($sql);
+
+    if ($stmt === false) {
+        die("Error preparing statement for gejala query: " . $koneksi->error);
+    }
+
+    $stmt->bind_param("i", $id_diagnosa);
+    $stmt->execute();
+    $result = $stmt->get_result();
+
+    if ($result->num_rows === 0) {
+        die("No gejala found for the given id_diagnosa.");
+    }
+
+    // Mengumpulkan bobot gejala
+    $bobot_gejala = [];
+    while ($row = $result->fetch_assoc()) {
+        $bobot_gejala[$row['id_gejala']] = $row['bobot'];
+    }
+    $stmt->close();
+
+    if (empty($bobot_gejala)) {
+        die("No gejala found for the given id_diagnosa.");
+    }
+
+    // Mengalikan bobot dengan nilai hipotesa dan menjumlahkan hasilnya
+    $total_hasil = 0;
+    foreach ($bobot_gejala as $id_gejala => $bobot) {
+        if (isset($nilai_hipotesa[$id_gejala])) {
+            $hasil = $bobot * $nilai_hipotesa[$id_gejala];
+            $total_hasil += $hasil;
+        }
+    }
+
+    $hasil = [];
+    foreach ($bobot_gejala as $id_gejala => $bobot) {
+        if (isset($nilai_hipotesa[$id_gejala])) {
+            $hasil[$id_gejala] = number_format($bobot * $nilai_hipotesa[$id_gejala], 3);
+        }
+    }
+
+    if ($tampilkan == 'jumlah') {
+        return number_format($total_hasil, 3);
+    } else if ($tampilkan == 'array') {
+        return $hasil;
+    }
+}
+
+
+// STEP 5 MENCARI NILAI (Hi | E)
+function nilai_Hi_E($id_diagnosa, $id_ph)
+{
+    // Mendapatkan array hasil perkalian dan jumlah total dari nilai_hipotesa_audience
+    $hasil_perkalian = nilai_hipotesa_audience($id_diagnosa, $id_ph, 'array');
+    $total_perkalian = nilai_hipotesa_audience($id_diagnosa, $id_ph, 'jumlah');
+
+    if ($total_perkalian == 0) {
+        die("Total perkalian is zero, cannot calculate Hi/E.");
+    }
+
+    // Membagi setiap nilai hasil perkalian dengan total perkalian
+    $nilai_Hi_E = [];
+    foreach ($hasil_perkalian as $id_gejala => $nilai) {
+        $nilai_Hi_E[$id_gejala] = number_format($nilai / $total_perkalian, 3);
+    }
+
+    return $nilai_Hi_E;
+}
+
+// STEP 4 MECARI NILAI BAYES DENGAN TEOREMA BAYES 
+function nilai_bayes($id_diagnosa, $id_ph, $tampilkan)
+{
+    global $koneksi;
+
+    // Mendapatkan nilai Hi/E dari fungsi nilai_Hi_E
+    $nilai_Hi_E = nilai_Hi_E($id_diagnosa, $id_ph);
+
+    // Mengambil bobot gejala dari tb_detail_diagnosa
+    $sql = "SELECT tb_detail_diagnosa.id_gejala, tb_gejala.bobot
+            FROM tb_detail_diagnosa
+            INNER JOIN tb_gejala ON tb_detail_diagnosa.id_gejala = tb_gejala.id_gejala
+            WHERE tb_detail_diagnosa.id_diagnosa = ?";
+
+    $stmt = $koneksi->prepare($sql);
+
+    if ($stmt === false) {
+        die("Error preparing statement for gejala query: " . $koneksi->error);
+    }
+
+    $stmt->bind_param("i", $id_diagnosa);
+    $stmt->execute();
+    $result = $stmt->get_result();
+
+    if ($result->num_rows === 0) {
+        die("No gejala found for the given id_diagnosa.");
+    }
+
+    // Mengumpulkan bobot gejala
+    $bobot_gejala = [];
+    while ($row = $result->fetch_assoc()) {
+        $bobot_gejala[$row['id_gejala']] = $row['bobot'];
+    }
+    $stmt->close();
+
+    if (empty($bobot_gejala)) {
+        die("No gejala found for the given id_diagnosa.");
+    }
+
+    // Mengalikan bobot dengan nilai Hi/E
+    $nilai_bayes = [];
+    $jumlah = 0;
+    foreach ($bobot_gejala as $id_gejala => $bobot) {
+        if (isset($nilai_Hi_E[$id_gejala])) {
+            $nilai_bayes[$id_gejala] = number_format($bobot * $nilai_Hi_E[$id_gejala], 3);
+            $jumlah += $nilai_bayes[$id_gejala] = number_format($bobot * $nilai_Hi_E[$id_gejala], 3);
+        }
+    }
+
+    // return $jumlah;
+
+
+    if ($tampilkan == 'nilai_bayes') {
+        return $jumlah;
+    } else if ($tampilkan == 'persentase') {
+        $jumlah = $jumlah * 100;
+        return $jumlah;
+    }
+}

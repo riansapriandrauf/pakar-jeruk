@@ -1,0 +1,28 @@
+RewriteEngine On
+Options -indexes
+# hapus ekstensi
+# RewriteRule ^logout app/controller/logout.php
+
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteCond %{REQUEST_FILENAME}.php -f
+RewriteRule ^(.*)$ $1.php
+
+RewriteRule ^([a-zA-Z0-9_-]+)$ index.php?page=$1
+RewriteRule ^([a-zA-Z0-9_-]+)/$ index.php?page=$1
+
+# KONFIRGURASI PEMANGGILAN ID
+RewriteCond $1 !^(index\.php)
+
+# PEMAGIILAN BERDASARKAN ID USER
+RewriteRule ^gejala-penyakit/([^/\.]+)/?$ index.php?page=gejala-penyakit&id=$1 [L] 
+RewriteRule ^gejala-hama/([^/\.]+)/?$ index.php?page=gejala-hama&id=$1 [L] 
+RewriteRule ^detail-diagnosa/([^/\.]+)/?$ index.php?page=detail-diagnosa&id=$1 [L]
+RewriteRule ^penanganan-penyakit/([^/\.]+)/?$ index.php?page=penanganan-penyakit&id=$1 [L]
+RewriteRule ^penanganan-hama/([^/\.]+)/?$ index.php?page=penanganan-hama&id=$1 [L]
+
+# DELETE 
+RewriteRule ^delete-gejala-ph/([^/\.]+)/?$ index.php?page=delete-gejala-ph&id=$1 [L]
+RewriteRule ^delete-ph/([^/\.]+)/?$ index.php?page=delete-ph&id=$1 [L]
+RewriteRule ^delete-data-gejala/([^/\.]+)/?$ index.php?page=delete-data-gejala&id=$1 [L]
+RewriteRule ^delete-diagnosa/([^/\.]+)/?$ index.php?page=delete-diagnosa&id=$1 [L]
+RewriteRule ^delete-penanganan/([^/\.]+)/?$ index.php?page=delete-penanganan&id=$1 [L]
