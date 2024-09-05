@@ -16,7 +16,7 @@ $ph = ucwords(str_replace('diagnosa-', '', $_GET['page']));
                                 <th class="text-center text-uppercase text-secondary text-xxs font-weight-bolder opacity-7" style="width: 5%;">No</th>
                                 <th class="text-center text-uppercase text-secondary text-xxs font-weight-bolder opacity-7" style="width: 5%;">Tanggal Diagnosa</th>
                                 <th class="text-center text-uppercase text-secondary text-xxs font-weight-bolder opacity-7 ps-2">Nama Pemilik</th>
-                                <th class="text-center text-uppercase text-secondary text-xxs font-weight-bolder opacity-7">Umur</th>
+                                <!-- <th class="text-center text-uppercase text-secondary text-xxs font-weight-bolder opacity-7">Umur</th> -->
                                 <th class="text-center text-uppercase text-secondary text-xxs font-weight-bolder opacity-7">Penyakit</th>
                                 <th class="text-center text-uppercase text-secondary text-xxs font-weight-bolder opacity-7">Probability</th>
                                 <th class="text-center text-uppercase text-secondary text-xxs font-weight-bolder opacity-7">Persentase</th>
@@ -37,7 +37,7 @@ $ph = ucwords(str_replace('diagnosa-', '', $_GET['page']));
                                     <td><?= $no ?></td>
                                     <td><?= tanggal_indo($data['tgl_diagnosa']) ?></span>
                                     <td><?= $data['nama_lengkap'] ?></td>
-                                    <td><?= hitung_umur($data['tgl_lahir']) ?> Tahun</td>
+                                    <!-- <td><?= hitung_umur($data['tgl_lahir']) ?> Tahun</td> -->
                                     <td>
                                         <?= diagnosa($data['id_diagnosa'], $ph, 'ph', 1); ?>
                                     </td>
@@ -51,7 +51,7 @@ $ph = ucwords(str_replace('diagnosa-', '', $_GET['page']));
                                         <a href="detail-diagnosa/<?= encrypt($data['id_diagnosa']) ?>" class="badge badge-sm bg-gradient-secondary text-white">
                                             Lihat Gejala
                                         </a>
-                                        <a href="penanganan-<?= strtolower($ph) ?>/<?= (diagnosa($data['id_diagnosa'], $ph, 'id_ph', 1)); ?>" class="badge badge-sm bg-gradient-warning">
+                                        <a href="penanganan-<?= strtolower($ph) ?>/<?= encrypt((diagnosa($data['id_diagnosa'], $ph, 'id_ph', 1))); ?>" class="badge badge-sm bg-gradient-warning">
                                             Cara Penanganan
                                         </a>
                                         <div class="mt-2">

@@ -6,7 +6,12 @@ $ph = ucwords(str_replace('penanganan-', '', $_GET['page']));
 ?>
 <div class="row">
     <div class="col-12">
-        <a data-bs-toggle="modal" data-bs-target="#tambah" class="btn btn-sm bg-gradient-success"><i class="fa fa-plus"></i> Tambah Pananganan</a>
+        <?php
+        if ($_SESSION['level'] == 1) { ?>
+            <a data-bs-toggle="modal" data-bs-target="#tambah" class="btn btn-sm bg-gradient-success"><i class="fa fa-plus"></i> Tambah Pananganan</a>
+        <?php
+        }
+        ?>
         <div class="card mb-4">
             <div class="card-header pb-0">
                 <h6>Data Penanganan <?= $ph . ' ' . $view['nama_ph'] ?></h6>

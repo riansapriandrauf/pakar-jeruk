@@ -21,9 +21,9 @@ function data_diagnosa($id_petani, $apa)
 {
     global $koneksi;
     if (empty($id_petani)) {
-        return mysqli_query($koneksi, "SELECT * FROM tb_diagnosa INNER JOIN tb_petani ON tb_petani.id_petani = tb_diagnosa.id_petani WHERE jenis_diagnosa='$apa' ORDER by tgl_diagnosa ASC");
-    }else{
-        return mysqli_query($koneksi, "SELECT * FROM tb_diagnosa INNER JOIN tb_petani ON tb_petani.id_petani = tb_diagnosa.id_petani WHERE jenis_diagnosa='$apa' and tb_petani.id_petani = '$id_petani' ORDER by tgl_diagnosa ASC");
+        return mysqli_query($koneksi, "SELECT * FROM tb_diagnosa INNER JOIN tb_petani ON tb_petani.id_petani = tb_diagnosa.id_petani WHERE jenis_diagnosa='$apa' ORDER by tgl_diagnosa DESC");
+    } else {
+        return mysqli_query($koneksi, "SELECT * FROM tb_diagnosa INNER JOIN tb_petani ON tb_petani.id_petani = tb_diagnosa.id_petani WHERE jenis_diagnosa='$apa' and tb_petani.id_petani = '$id_petani' ORDER by tgl_diagnosa DESC");
     }
 }
 
@@ -58,4 +58,12 @@ function data_penanganan($id)
 {
     global $koneksi;
     return mysqli_query($koneksi, "SELECT * FROM tb_penanganan WHERE id_ph = $id");
+}
+
+function foto_ph($id_ph)
+{
+    global $koneksi;
+    $ce = mysqli_query($koneksi, "SELECT * FROM tb_ph WHERE id_ph = $id_ph");
+    $d_fot = mysqli_fetch_array($ce);
+    return $d_fot['foto'];
 }

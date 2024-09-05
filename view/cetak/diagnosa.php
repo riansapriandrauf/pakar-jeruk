@@ -11,6 +11,7 @@ $sql = mysqli_query($koneksi, "SELECT * FROM tb_diagnosa
     ORDER by tb_diagnosa.tgl_diagnosa ASC");
 $data_d = mysqli_fetch_array($sql);
 $ph = strtolower($data_d['jenis_diagnosa']);
+$id_ph = diagnosa($id_diagnosa, $ph, 'id_ph')
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -94,18 +95,18 @@ $ph = strtolower($data_d['jenis_diagnosa']);
                     <td>Penyakit / Hama </td>
                     <td>:</td>
                     <td>
-                        <?= diagnosa($data_d['id_diagnosa'], $ph, 'ph', 1); ?>
+                        <?= diagnosa($id_diagnosa, $ph, 'ph'); ?>
                     </td>
                 </tr>
                 <tr>
                     <td>Probability</td>
                     <td>:</td>
-                    <td><?= diagnosa($data_d['id_diagnosa'], $ph, 'nilai_bayes', 1); ?></td>
+                    <td><?= diagnosa($id_diagnosa, $ph, 'nilai_bayes', 1); ?></td>
                 </tr>
                 <tr>
                     <td>Nilai Persentasi</td>
                     <td>:</td>
-                    <td><?= diagnosa($data_d['id_diagnosa'], $ph, 'persentase', 1); ?>%</td>
+                    <td><?= diagnosa($id_diagnosa, $ph, 'persentase', 1); ?>%</td>
                 </tr>
             </tbody>
         </table>
@@ -156,29 +157,45 @@ $ph = strtolower($data_d['jenis_diagnosa']);
                 </tr>
             </thead>
             <tbody>
-                <tr class="text-center">
-                    <td>1</td>
-                    <td><?= diagnosa($id_diagnosa, $ph, 'kode_ph', 1) ?></td>
-                    <td><?= diagnosa($id_diagnosa, $ph, 'ph', 1) ?></td>
-                    <td><?= diagnosa($id_diagnosa, $ph, 'nilai_bayes', 1) ?></td>
-                    <td><?= diagnosa($id_diagnosa, $ph, 'persentase', 1) ?>%</td>
-                </tr>
+                <?php
+                $no1 = 1;
+                $phh = diagnosa2($id_diagnosa);
+                foreach ($phh as $ph2) { ?>
+                    <tr>
+                        <td><?= $no1 ?></td>
+                        <td><?= $ph2['kode_ph'] ?></td>
+                        <td><?= $ph2['nama_ph'] ?></td>
+                        <td>
+                            <?php
+                            if($ph2['id_ph'] == $id_ph){
+                                echo diagnosa($id_diagnosa, $ph, 'nilai_bayes');
+                            }else{
+                                echo nilai_bayes2($id_diagnosa, $ph2['id_ph'], 'nilai_bayes');
+                            }
+                            ?>
+                        </td>
+                        <td>
+                            <?php
+                            if($ph2['id_ph'] == $id_ph){
+                                echo diagnosa($id_diagnosa, $ph, 'persentase').'%';
+                            }else{
+                                echo nilai_bayes2($id_diagnosa, $ph2['id_ph'], 'persentase').'%';
+                            }
+                            ?>
+                        </td>
+                    </tr>
+                <?php
+                }
+                ?>
             </tbody>
         </table>
-        <?php
-        // Menampilkan hasil dalam bentuk tabel
-        penyakit_terkait($id_diagnosa, 'tabel');
-
-        ?>
-
         <div class="text-center">
-            <p>GAMBAR <?= strtoupper($ph) ?> <?= diagnosa($id_diagnosa, $ph, 'ph', 1) ?> YANG DI DERITA TANAMAN JERUK</p>
-            <?php
-            $id_ph = diagnosa($id_diagnosa, $ph, 'id_ph', 1);
-            $ce = mysqli_query($koneksi, "SELECT * FROM tb_ph WHERE id_ph = $id_ph");
-            $d_fot = mysqli_fetch_array($ce);
-            ?>
-            <img class="foto" src="assets/img/ph/<?= $d_fot['foto'] ?>" alt="Foto" style="width: 40%;">
+            <p>GAMBAR
+                <?= strtoupper($ph) ?>
+                <?= diagnosa($id_diagnosa, $ph, 'ph') ?>
+                YANG DI DERITA TANAMAN JERUK
+            </p>
+            <img class="foto" src="assets/img/ph/<?= foto_ph($id_ph); ?>" alt="Foto" style="width: 40%;">
         </div>
 
         <div class="text-left ">

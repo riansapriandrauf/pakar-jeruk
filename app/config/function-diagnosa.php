@@ -75,22 +75,22 @@ function diagnosa($id_diagnosa, $jenis_ph, $tampil)
     $id_ph      = $best_match['id_ph'];
     $kode_ph    = $best_match['kode_ph'];
     $nama_ph    = $best_match['nama_ph'];
-    
+
     $persentase = nilai_bayes($id_diagnosa, $id_ph, 'persentase');
-    if($persentase < 55){
+    if ($persentase < 55) {
         $kepastian = 'Tidak pasti';
-    }else if($persentase >= 55 && $persentase <= 75){
+    } else if ($persentase >= 55 && $persentase <= 75) {
         $kepastian = 'Pasti';
-    }else if($persentase >= 76){
+    } else if ($persentase >= 76) {
         $kepastian = 'Sangat Pasti';
     }
-    $text = "<p>Berdasarkan Hasil Perhitungan dengan menggunakan metode Teorema Bayes, gejala yang dialami oleh tanaman jeruk, Maka Dapat Disimpulkan Nilai Tertinggi Dari perhitungan yang telah dilakukan adalah <b>$kode_ph</b> Yaitu $jenis_ph <b>$nama_ph</b> Dengan Nilai Probabilitas " .nilai_bayes($id_diagnosa, $id_ph, 'nilai_bayes') . " Atau $persentase% Dengan Kategori $kepastian</p>";
+    $text = "<p>Berdasarkan Hasil Perhitungan dengan menggunakan metode Teorema Bayes, gejala yang dialami oleh tanaman jeruk, Maka Dapat Disimpulkan Nilai Tertinggi Dari perhitungan yang telah dilakukan adalah <b>$kode_ph</b> Yaitu $jenis_ph <b>$nama_ph</b> Dengan Nilai Probabilitas " . nilai_bayes($id_diagnosa, $id_ph, 'nilai_bayes') . " Atau $persentase% Dengan Kategori $kepastian</p>";
 
-    if ($tampil == 'text'){
+    if ($tampil == 'text') {
         return $text;
     } else if ($tampil == 'id_ph') {
         return $id_ph;
-    }else if ($tampil == 'kode_ph') {
+    } else if ($tampil == 'kode_ph') {
         return $kode_ph;
     } else if ($tampil == 'ph') {
         return $nama_ph;
@@ -307,7 +307,7 @@ function nilai_Hi_E($id_diagnosa, $id_ph)
     return $nilai_Hi_E;
 }
 
-// STEP 4 MECARI NILAI BAYES DENGAN TEOREMA BAYES 
+// STEP 6 MECARI NILAI BAYES DENGAN TEOREMA BAYES 
 function nilai_bayes($id_diagnosa, $id_ph, $tampilkan)
 {
     global $koneksi;
@@ -367,48 +367,28 @@ function nilai_bayes($id_diagnosa, $id_ph, $tampilkan)
     }
 }
 
-// Fungsi untuk menampilkan penyakit terkait dengan gejala tertentu
-function penyakit_terkait($id_diagnosa, $tampil = 'array')
+
+
+// CLONE FUNSI 
+function diagnosa2($id_diagnosa)
 {
     global $koneksi;
-
-    // Mengambil gejala-gejala yang terkait dengan id_diagnosa
-    $sql = "SELECT id_gejala FROM tb_detail_diagnosa WHERE id_diagnosa = ?";
-    $stmt = $koneksi->prepare($sql);
-
-    if ($stmt === false) {
-        die("Error preparing statement for gejala query: " . $koneksi->error);
+    $gejala_ids = getGejalaByDiagnosa($id_diagnosa);
+    // Pastikan $gejala_ids adalah array dari ID gejala
+    if (!is_array($gejala_ids) || empty($gejala_ids)) {
+        return "Gejala IDs harus berupa array yang tidak kosong.";
     }
 
-    $stmt->bind_param("i", $id_diagnosa);
-    $stmt->execute();
-    $result = $stmt->get_result();
-
-    if ($result->num_rows === 0) {
-        die("No gejala found for the given id_diagnosa.");
-    }
-
-    $gejala_ids = [];
-    while ($row = $result->fetch_assoc()) {
-        $gejala_ids[] = $row['id_gejala'];
-    }
-    $stmt->close();
-
-    if (empty($gejala_ids)) {
-        die("No gejala found for the given id_diagnosa.");
-    }
-
-    // Mengambil penyakit yang terkait dengan gejala-gejala tersebut
+    // Mengambil semua penyakit (PH) yang terkait dengan gejala
     $gejala_ids_placeholders = implode(',', array_fill(0, count($gejala_ids), '?'));
     $sql = "SELECT tb_ph.id_ph, tb_ph.kode_ph, tb_ph.nama_ph, COUNT(tb_gejala_ph.id_gejala) as gejala_count
             FROM tb_ph
             JOIN tb_gejala_ph ON tb_ph.id_ph = tb_gejala_ph.id_ph
             WHERE tb_gejala_ph.id_gejala IN ($gejala_ids_placeholders)
-            GROUP BY tb_ph.id_ph";
-
+            GROUP BY tb_ph.id_ph
+            ORDER BY gejala_count DESC";
     $stmt = $koneksi->prepare($sql);
-
-    if ($stmt === false) {
+    if (!$stmt) {
         die("Error preparing statement for penyakit query: " . $koneksi->error);
     }
 
@@ -417,42 +397,88 @@ function penyakit_terkait($id_diagnosa, $tampil = 'array')
     $stmt->bind_param($types, ...$gejala_ids);
     $stmt->execute();
     $result = $stmt->get_result();
-
     if ($result->num_rows === 0) {
-        die("No penyakit found matching the given gejala.");
+        return "No penyakit found matching the given gejala.";
     }
 
-    $penyakit_terkait = [];
+    $penyakit = [];
     while ($row = $result->fetch_assoc()) {
-        $penyakit_terkait[] = [
+        $penyakit[] = [
             'id_ph' => $row['id_ph'],
             'kode_ph' => $row['kode_ph'],
             'nama_ph' => $row['nama_ph'],
-            'gejala_count' => $row['gejala_count']
         ];
     }
     $stmt->close();
 
-    // Mengembalikan hasil dalam bentuk array atau tabel
-    if ($tampil == 'array') {
-        return $penyakit_terkait;
-    } else if ($tampil == 'tabel') {
-        echo "<table border='1'>";
-        echo "<tr>
-            <th>Kode Penyakit</th>
-            <th>Nama Penyakit</th>
-            <th>Nilai Bayes</th>
-            <th>persentase</th>
-        </tr>";
-        foreach ($penyakit_terkait as $penyakit) {
-            echo "<tr>";
-            echo "<td>{$penyakit['kode_ph']}</td>";
-            echo "<td>{$penyakit['nama_ph']}</td>";
-            echo "<td>".nilai_bayes($id_diagnosa, $penyakit['id_ph'], 'nilai_bayes')."</td>";
-            echo "<td>".nilai_bayes($id_diagnosa, $penyakit['id_ph'], 'persentase')."</td>";
-            echo "</tr>";
-        }
-        echo "</table>";
-    }
+    return $penyakit;
 }
 
+function getGejalaByDiagnosa($id_diagnosa)
+{
+    global $koneksi;
+
+    // Pastikan id_diagnosa valid
+    if (empty($id_diagnosa)) {
+        return "ID Diagnosa tidak boleh kosong.";
+    }
+
+    // SQL untuk mengambil semua id_gejala berdasarkan id_diagnosa
+    $sql = "SELECT id_gejala 
+            FROM tb_detail_diagnosa 
+            WHERE id_diagnosa = ?";
+
+    // Siapkan statement
+    $stmt = $koneksi->prepare($sql);
+    if (!$stmt) {
+        die("Error preparing statement: " . $koneksi->error);
+    }
+
+    // Bind parameter (id_diagnosa)
+    $stmt->bind_param('i', $id_diagnosa);
+    $stmt->execute();
+    $result = $stmt->get_result();
+
+    // Cek jika tidak ada gejala yang ditemukan
+    if ($result->num_rows === 0) {
+        return "Tidak ada gejala ditemukan untuk ID diagnosa ini.";
+    }
+
+    // Array untuk menyimpan id_gejala
+    $gejala_ids = [];
+    while ($row = $result->fetch_assoc()) {
+        $gejala_ids[] = $row['id_gejala'];
+    }
+
+    // Tutup statement
+    $stmt->close();
+
+    // Kembalikan array gejala IDs
+    return $gejala_ids;
+}
+
+
+function nilai_bayes2($id_diagnosa, $id_ph, $tampil)
+{
+    global $koneksi;
+    $sql = mysqli_query($koneksi, "SELECT SUM(tb_gejala.bobot) as total_bobot
+        FROM tb_gejala
+        INNER JOIN tb_gejala_ph ON tb_gejala_ph.id_gejala = tb_gejala.id_gejala
+        INNER JOIN tb_ph ON tb_ph.id_ph = tb_gejala_ph.id_ph
+        INNER JOIN tb_detail_diagnosa ON tb_detail_diagnosa.id_gejala = tb_gejala.id_gejala
+        WHERE tb_ph.id_ph = '$id_ph' AND tb_detail_diagnosa.id_diagnosa = '$id_diagnosa'");
+
+    $row = mysqli_fetch_assoc($sql);
+
+    $sql_jum = mysqli_query($koneksi, "SELECT * FROM tb_detail_diagnosa WHERE id_diagnosa = '$id_diagnosa'");
+    $jumlah_gejala = mysqli_num_rows($sql_jum);
+    // Kembalikan nilai total bobot
+    $total_bobot = $row['total_bobot'] ? $row['total_bobot'] : 0;
+    $nilai_bayes = $total_bobot / $jumlah_gejala;
+    if($tampil == 'nilai_bayes'){
+        return number_format($nilai_bayes,3);
+    }else if($tampil == 'persentase'){
+        return number_format($nilai_bayes*100, 1);
+    }
+
+}
